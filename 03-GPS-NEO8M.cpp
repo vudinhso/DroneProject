@@ -59,6 +59,17 @@ void displayInfo()
     Serial.print(F("INVALID"));
   }
 
+  Serial.print(F("  Altitude: "));
+  if (gps.altitude.isValid())
+  {
+    Serial.print(gps.altitude.meters());
+    Serial.print(F("m"));
+  }
+  else
+  {
+    Serial.print(F("INVALID"));
+  }
+
   Serial.print(F("  Date/Time: "));
   if (gps.date.isValid())
   {
