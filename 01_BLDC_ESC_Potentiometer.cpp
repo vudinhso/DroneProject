@@ -22,8 +22,8 @@ void Init_ESC();        // Function to init the ESC
 // ================================================================
 void setup()
 {
-  Init_Serial();
-  Init_ESC();
+  Init_Serial(); // Initialize the serial communication
+  Init_ESC();    // Initialize the ESC
 }
 // ================================================================
 // Loop
@@ -32,7 +32,7 @@ void loop()
 {
   CtrlPWM = map(analogRead(POT_PIN), 0, 4095, 0, 180); // Read the pot, map the reading from [0, 4095] to [0, 180]
   ESC.write(CtrlPWM);                                  // Send the command to the ESC
-  SerialDataPrint();
+  SerialDataPrint();                                   // Print data on the serial monitor for debugging
 }
 
 // ================================================================
