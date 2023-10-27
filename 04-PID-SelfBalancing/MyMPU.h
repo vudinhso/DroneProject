@@ -19,13 +19,28 @@ uint8_t fifoBuffer[64]; // FIFO storage buffer
 Quaternion q;                  // [w, x, y, z]         quaternion container
 VectorFloat gravity;           // [x, y, z]            gravity vector
 float ypr[3];                  // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
-double angleX, angleY, angleZ; // x, y, z angular position
-double gyroX, gyroY, gyroZ;    // x, y, z angular velocity
+double anglex, angley, anglez; // x, y, z angular position
+double gyrox, gyroy, gyroz;    // x, y, z angular velocity
+double accx, accy, accz;       // x, y, z linear acceleration
 
 // ================================================================
 // Function Definition
 // ================================================================
-void readFifoBuffer()
+
+void Init_MPU()
+{
+  Wire.begin(4, 16);       // Wire.begin(I2C_SDA, I2C_SCL);
+  Wire.setClock(400000);   // Set the SCL clock to 400KHz
+  accelgyro.initialize();  // Initialize the accelgyro
+  mpu.initialize();        // Initialize the MPU
+  mpu.dmpInitialize();     // Initialize the DMP (microchip that calculate the angle on the MPU6050 module)
+  mpu.setDMPEnabled(true); // Enable the DMP
+  packetSize = mpu.dmpGetFIFOPacketSize();
+  mpu.CalibrateAccel(6); // Calibrate the accelerometer
+  mpu.CalibrateGyro(6);  // Calibrate the gyroscope
+}
+// ================================================================
+void Get_MPUangle()
 {
   // Clear buffer
   mpu.resetFIFO();
@@ -39,34 +54,18 @@ void readFifoBuffer()
   mpu.dmpGetQuaternion(&q, fifoBuffer);
   mpu.dmpGetGravity(&gravity, &q);
   mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-  angleX = ypr[2] * 180 / M_PI;
-  angleY = -ypr[1] * 180 / M_PI;
-  angleZ = -ypr[0] * 180 / M_PI;
+  anglex = ypr[2] * 180 / M_PI;
+  angley = -ypr[1] * 180 / M_PI;
+  anglez = -ypr[0] * 180 / M_PI;
 }
 // ================================================================
-void init_MPU()
+void Get_accelgyro()
 {
-  // Wire.begin(I2C_SDA, I2C_SCL);
-  Wire.begin(4, 16);
-  Wire.setClock(400000);
-
-  mpu.initialize();
-  mpu.dmpInitialize();
-
-  mpu.CalibrateAccel(6);
-  mpu.CalibrateGyro(6);
-
-  mpu.setDMPEnabled(true);
-  packetSize = mpu.dmpGetFIFOPacketSize();
-
-  // mpu.setDLPFMode(0x02); // MPU6050_DLPF_BW_98
-}
-// ================================================================
-void getData_MPU()
-{
-  readFifoBuffer();
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  gyroX = gx / 131.0;
-  gyroY = gy / 131.0;
-  gyroZ = gz / 131.0;
+  gyrox = gx / 131.0;
+  gyroy = gy / 131.0;
+  gyroz = gz / 131.0;
+  accx = ax / 16384.;
+  accy = ay / 16384.;
+  accz = az / 16384.;
 }
