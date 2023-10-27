@@ -22,10 +22,11 @@
 #define PWM_FREQ 30000
 #define PWM_RES 8
 
+extern double motor_cmd; 
 int PWM_A = 127, PWM_B = 127, PWM_C = 127, PWM_D = 127;
 int LValue, RValue, commaIndex;
 
-void init_MotorPin()
+void Init_MotorPin()
 {
   // Define GPIO as output
   pinMode(MOT_ENA1, OUTPUT);
@@ -74,4 +75,12 @@ void init_MotorPin()
   ledcWrite(PWM_CHA_AIN2, PWM_A);
   ledcWrite(PWM_CHA_CIN1, PWM_C);
   ledcWrite(PWM_CHA_CIN2, PWM_C);
+}
+
+void Run_Motor()
+{
+  ledcWrite(PWM_CHA_AIN1, motor_cmd);
+  ledcWrite(PWM_CHA_AIN2, motor_cmd);
+  ledcWrite(PWM_CHA_CIN1, motor_cmd);
+  ledcWrite(PWM_CHA_CIN2, motor_cmd);
 }
