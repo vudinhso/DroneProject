@@ -1,91 +1,39 @@
-#include <Arduino.h>
-#include "MyMPU.h"
-#include "MySerial.h"
-#include "MyMotorConfig.h"
-#include <PID_v1.h>
+#include <Arduino.h>       // Arduino library
+#include "MyMPU.h"         // Personal library to configure the MPU6050
+#include "MySerial.h"      // Personal library to configure the serial communication
+#include "MyMotorConfig.h" // Personal library to configure the motor
+#include "MyPID.h"         // Personnal library to configure the PID
 
 // ================================================================
 // Variable declaration
 // ================================================================
-unsigned long time_prev = 0;
-
-// PID
-// input = sensor; output = pid output; setpoint = reference setpoint
-// PID myPID(&input, &output, &setpoint, kp, ki, kd, DIRECT);
-
-// Innerloop
-double gyroX_setpoint = 0, motor_cmd = 0, motor_cmd_tmp = 0;
-double kp1 = 2., ki1 = 0.0, kd1 = .0;
-PID myPID1(&gyroX, &motor_cmd, &gyroX_setpoint, kp1, ki1, kd1, DIRECT);
-
-// Outerloop
-double angleX_setpoint = 0 ;
-// double kp2 = 6.0, ki2 = 40.0, kd2 = .0;
-double kp2 = 2., ki2 = 0.0, kd2 = .0;
-PID myPID2(&angleX, &gyroX_setpoint, &angleX_setpoint, kp2, ki2, kd2, DIRECT);
-
-// //Single Loop
-// double angleX_setpoint = 0, motor_cmd = 0, motor_cmd_tmp = 0;
-// double kp = 4.0, ki = 2.0, kd = 0.0;
-// PID myPID(&angleX, &motor_cmd, &angleX_setpoint, kp, ki, kd, DIRECT);
-
+// Most of the variables are declared in the personal library
 // ================================================================
 // Function Declaration
 // ================================================================
-void SerialDataPrint();
-void SerialDataWrite();
-
+// These function are kept in the main.cpp because it is easier to modify
+void SerialDataPrint(); // Data from the microcontroller to the PC
+void SerialDataWrite(); // Data from the PC to the microcontroller
 // ================================================================
 // Setup function
 // ================================================================
 void setup()
 {
-  init_serial();
-  init_MPU();
-  init_MotorPin();
-
-  myPID1.SetMode(AUTOMATIC);
-  myPID1.SetOutputLimits(-127, 127);
-  // myPID1.SetSampleTime(10);
-
-  myPID2.SetMode(AUTOMATIC);
-  myPID2.SetOutputLimits(-127, 127);
-  // myPID2.SetSampleTime(10);
-
-  // myPID.SetMode(AUTOMATIC);
-  // myPID.SetOutputLimits(-127, 127);
-  // myPID.SetSampleTime(10);
+  Init_Serial();   // Initialize the serial communication
+  Init_MPU();      // Initialize the MPU
+  Init_MotorPin(); // Initialize the motor pin
+  Init_PID();      // Initialize the PID
 }
-
 // ================================================================
 // Loop function
 // ================================================================
 void loop()
 {
-  getData_MPU();
-  // myPID.SetTunings(kp, ki, kd); 
-  myPID2.SetTunings(kp2, ki2, kd2); 
-  myPID1.SetTunings(kp1, ki1, kd1); 
-
-  myPID2.Compute(); // Outerloop
-  myPID1.Compute(); // Innerloop
-  // myPID.Compute(); // SingleLoop
-  // if (abs(motor_cmd) < 5) motor_cmd = 0; // Dead band
-  // if (abs(angleX) < 3 ) motor_cmd = 0; // Dead band
-  if (abs(angleX) > 30) motor_cmd = 0; // motor stop when fall
-  // if  (motor_cmd > 60)  angleX_setpoint += .05; // auto-leveling
-  // if  (motor_cmd <-60)  angleX_setpoint -= .05; // auto-leveling
-
-  motor_cmd_tmp = map(motor_cmd, -127, 127, 0, 256);
-  // if (motor_cmd > 0) motor_cmd_tmp = map(motor_cmd, 0, 127, 127+10, 256);
-  // if (motor_cmd < 0) motor_cmd_tmp = map(motor_cmd, -127, 0, 0, 127-10);
-
-  ledcWrite(PWM_CHA_AIN1, motor_cmd_tmp);
-  ledcWrite(PWM_CHA_AIN2, motor_cmd_tmp);
-  ledcWrite(PWM_CHA_CIN1, motor_cmd_tmp);
-  ledcWrite(PWM_CHA_CIN2, motor_cmd_tmp);
-  SerialDataPrint();
-  SerialDataWrite();
+  Get_MPUangle();    // Get the angle (anglex) from the IMU sensor
+  Compute_PID();     // Compute the PID output (motor_cmd)
+  Run_Motor();       // Send the PID output (motor_cmd) to the motor
+  SerialDataPrint(); // Print the data on the serial monitor for debugging
+  SerialDataWrite(); // User data to tune the PID parameters
 }
 
 // ================================================================
@@ -96,30 +44,31 @@ void SerialDataPrint()
   if (micros() - time_prev >= 50000)
   {
     time_prev = micros();
-    // Serial.print(millis());
-    // Serial.print("\t");
-    Serial.print(angleX);
+    Serial.print(millis());
+    Serial.print("\t");
+    Serial.print(anglex);
     Serial.print("\t");
     Serial.print(motor_cmd);
     Serial.print("\t");
-    Serial.print( kp2);
+    Serial.print(kp);
     Serial.print("\t");
-    Serial.print( ki2);
+    Serial.print(ki);
     Serial.print("\t");
-    Serial.print( kd2);
+    Serial.print(kd);
     Serial.print("\t");
-    Serial.print( angleX_setpoint);
-    // Serial.print("\t");
-    // Serial.print(gyroX);
-    // Serial.print("\t");
-    // Serial.print(gyroY);
-    // Serial.print("\t");
-    // Serial.print(gyroZ);
+    Serial.print(anglex_setpoint);
+
     Serial.println();
   }
 }
 
 // ================================================================
+// Function to tune the PID parameters. For example: 
+// To change the P value to 10, type p10
+// To change the I value to -5, type i-5
+// To change the D value to 2.4, type d2.4
+// To change the setpoint to 3, type s3
+
 void SerialDataWrite()
 {
   static String received_chars;
@@ -132,34 +81,23 @@ void SerialDataWrite()
       switch (received_chars[0])
       {
       case 'p':
-        received_chars.remove(0,1); 
-        kp2 = received_chars.toFloat();
+        received_chars.remove(0, 1);
+        kp = received_chars.toFloat();
         break;
       case 'i':
-        received_chars.remove(0,1); 
-        ki2 = received_chars.toFloat();
+        received_chars.remove(0, 1);
+        ki = received_chars.toFloat();
         break;
       case 'd':
-        received_chars.remove(0,1); 
-        kd2 = received_chars.toFloat();
+        received_chars.remove(0, 1);
+        kd = received_chars.toFloat();
         break;
-      case 'r':
-        received_chars.remove(0,1); 
-        angleX_setpoint = received_chars.toFloat();
+      case 's':
+        received_chars.remove(0, 1);
+        anglex_setpoint = received_chars.toFloat();
       default:
         break;
       }
-      // angleX_setpoint = received_chars.toFloat();
-      // if (received_chars[0] == 'p')
-      // {
-      //   received_chars.remove(0,1); 
-      //   kp = received_chars.toFloat();
-      // }
-      // if (received_chars[0] == 'i')
-      // {
-      //   received_chars.remove(0,1); 
-      //   ki = received_chars.toFloat();
-      // }
       received_chars = "";
     }
   }
