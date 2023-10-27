@@ -1,6 +1,7 @@
 #include <Arduino.h>
+unsigned long time_prev = 0;
 
-void init_serial()
+void Init_Serial()
 {
   Serial.begin(115200);
   while (!Serial)
